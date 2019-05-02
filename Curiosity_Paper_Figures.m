@@ -3,17 +3,17 @@
 clear 
 close all
 
+% rng('default')
 rng('shuffle')
 
-based    = pwd;
-data_dir = fullfile(based,filesep,'SomeData');
+based = pwd;
+data_dir = fullfile(based,'SomeData');
 
 cd(based)
 addpath(data_dir)
 
 % you also need to add spm12 and spm12\toolbox\DEM to your path
 
-% set to true for whatever you want to simulate:
 active_learning         = false;
 active_learning_lots    = false;
 active_inference        = false;
@@ -28,7 +28,6 @@ active_learning_value   = false;
 
 %% ========================================================================
 % 1.) Active Learning
-% Figs 3-6
 % Problem: Rat in a maze has to decide whether to go for safe option (left)
 % or try risky option (right) with higher reward but possibility of winning
 % nothing
@@ -46,7 +45,7 @@ if active_learning
 
     simulate = false;
 
-    N_Figures   = [3 4 51 52 61 62];
+    N_Figures   = 1:6;
     Rprobs      = [0.5 0.75 0.5 0.5 0.75 0.75];
     betas       = [2^0 2^0 2^-3 2^3 2^0 2^3];
     alphas      = [4 4 4 4 4 4];
@@ -64,7 +63,7 @@ if active_learning
         curiosity = curiosities(idx_figure);  % goal-directed exploration?
 
         mdp       = gen_mdp_learning(Rprob,beta,alpha,eta,curiosity);
-
+        
         if simulate
             
             MDP = mdp;
@@ -82,14 +81,17 @@ if active_learning
 
         % plot
         figure(N_Figures(idx_figure)), set(gcf,'color','white')
-        Plot_Experiment_Curiosity(MDP,mdp);
+        if idx_figure<3
+            Plot_Experiment_Curiosity(MDP,mdp);
+        else
+            Plot_Experiment_Curiosity_noCon(MDP,mdp);
+        end
 
     end
 
 end
 %% ========================================================================
 % 2.) Active Learning - simulate lots of trials
-% Fig 7
 % Problem: Rat in a maze has to decide whether to go for safe option (left)
 % or try risky option (right) with higher reward but possibility of winning
 % nothing
@@ -104,9 +106,9 @@ if active_learning_lots
 
     simulate = false;
 
-    N_Figures   = [71 72 73];
+    N_Figures   = 1:3;
     Rprobs      = [0.5 0.5 0.5];
-    betas       = [2^0 2^3 2^3];
+    betas       = [2^0 2^3 2^1];
     alphas      = [4 4 4];
     etas        = [0.5 0.5 0.5];
     curiosities = [true false false];
@@ -116,7 +118,7 @@ if active_learning_lots
 
     N_sims = 1000;
 
-    for idx_figure = 1%:length(N_Figures)
+    for idx_figure = 1:length(N_Figures)
 
         Rprob     = Rprobs(idx_figure);       % probability for receiving reward in risky option
         beta      = betas(idx_figure);        % precision of policy selection
@@ -125,8 +127,6 @@ if active_learning_lots
         curiosity = curiosities(idx_figure);  % goal-directed exploration?
 
         mdp       = gen_mdp_learning(Rprob,beta,alpha,eta,curiosity);
-        
-        mdp.C{2}(4) = 0;
 
         if ~learning(idx_figure)
            mdp = rmfield(mdp,'a'); 
@@ -220,31 +220,36 @@ if active_learning_lots
 
             plot_size   = min(size(A_plot)); A_plot = A_plot(1:plot_size,1:plot_size);
 
-            figure, set(gcf,'color','white')
+            figure(N_Figures(idx_figure)), set(gcf,'color','white')
             imagesc(A_plot)
-            title('Probability to choose risky option as a function of observation model')
-            set(gca, 'YTick', [1:2:plot_size]),set(gca, 'YTickLabel', {[(plot_size/2-1)*0.5+0.25:-0.5:0.25]}),ylabel('Concentration Parameter no reward')
-            set(gca, 'XTick', [1:2:plot_size]),set(gca, 'XTickLabel', {[0.25:0.5:(plot_size/2-1)*0.5+0.25]}),xlabel('Concentration Parameter high reward')
+            title('Probability to choose risky option as a function of observation model','fontsize',13)
+            set(gca, 'YTick', [1:2:plot_size]),set(gca, 'YTickLabel', {[(plot_size/2-1)*0.5+0.25:-0.5:0.25]}),ylabel('Concentration Parameter no reward','fontsize',14)
+            set(gca, 'XTick', [1:2:plot_size]),set(gca, 'XTickLabel', {[0.25:0.5:(plot_size/2-1)*0.5+0.25]}),xlabel('Concentration Parameter high reward','fontsize',14)
             colorbar,caxis([0 1])
 
         end
 
         % Plot prob to choose risky as a function of trials:
-        prob_risky_trialNum = splitapply(@mean,Prob_risky,Trial_num);
-
-        figure, set(gcf,'color','white')
-        plot(prob_risky_trialNum,'-.','LineWidth',2)
-        title('Probability to choose risky option as a function of time')
-        set(gca, 'YTick', [0:0.25:1]), ylabel('Probability'),ylim([0,1])
-        set(gca, 'XTick', [0:2:length(prob_risky_trialNum)]),xlabel('Trial Number')
+        prob_risky_trialNum(idx_figure,:) = splitapply(@mean,Prob_risky,Trial_num)';
+        
+%         save(saved_data{idx_figure},'data')
 
     end
+    
+    figure(N_Figures(end)), hold on
+    set(gcf,'color','white')
+    plot(prob_risky_trialNum(1,:),'-.','LineWidth',2)
+    plot(prob_risky_trialNum(2,:),'-.','LineWidth',2)
+    plot(prob_risky_trialNum(3,:),'-.','LineWidth',2)
+    title('Probability to choose risky option as a function of time','fontsize',15)
+    set(gca, 'YTick', [0:0.25:1]), ylabel('Probability','fontsize',14),ylim([0,1])
+    set(gca, 'XTick', [0:2:length(prob_risky_trialNum)]),xlabel('Trial Number','fontsize',14)
+    legend('Active Learning','Random Exploration','No Learnnig')
 
 end
 
 %% ========================================================================
 % 3.) Active Inference
-% Figs 9-11
 % Problem: Rat in a maze has to decide whether to go for safe option (left)
 % or try risky option (right) with higher reward but possibility of winning
 % nothing - or whether to sample a cue that is indicative of the reward
@@ -260,9 +265,9 @@ if active_inference
 
     simulate = false;
 
-    N_Figures   = [9 10 11];
+    N_Figures   = 1:3;
     betas       = [2^0 2^0 2^0];
-    alphas      = [16 16 8];
+    alphas      = [16 16 16];
     etas        = [0.5 0.5 0.5];
     ambiguities = [true true false];
 
@@ -276,7 +281,7 @@ if active_inference
         ambiguity = ambiguities(idx_figure);  % goal-directed exploration?
 
         mdp       = gen_mdp_inference(beta,alpha,eta,ambiguity);
-
+        
         if simulate
             
             MDP = mdp;
@@ -299,7 +304,7 @@ if active_inference
 
         % plot
         figure(N_Figures(idx_figure)), set(gcf,'color','white')
-        Plot_Experiment_Ambiguity(MDP,mdp);
+        Plot_Experiment_Ambiguity_noCon(MDP,mdp);
 
 
     end
@@ -308,7 +313,6 @@ end
 
 %% ========================================================================
 % 4.) Active Inference - simulate lots of trials
-% Figs 9b-11b
 % Problem: Rat in a maze has to decide whether to go for safe option (left)
 % or try risky option (right) with higher reward but possibility of winning
 % nothing - or whether to sample a cue that is indicative of the reward
@@ -319,14 +323,13 @@ if active_inference_lots
 
     %%%% USED IN PAPER %%%%
     saved_data = {'data_sim_state_ambiguity_random' ...            % example of inference, random context
-                  'data_sim_state_ambiguity' ...     % example of inference, stable context
-                  'data_sim_state_noambiguity'};            % example of no inference, stable context
+                  'data_sim_state_ambiguity'};                     % example of inference, stable context
 
     simulate = false;
 
-    N_Figures   = [92 102 112];
+    N_Figures   = 1:2;
     betas       = [2^0 2^0 2^0];
-    alphas      = [16 16 8];
+    alphas      = [16 16 16];
     etas        = [0.5 0.5 0.5];
     ambiguities = [true true false];
 
@@ -334,7 +337,7 @@ if active_inference_lots
 
     N_sims = 1000;
 
-    for idx_figure = 1:length(N_Figures)
+    for idx_figure = 1:length(N_Figures)       
 
         beta      = betas(idx_figure);        % precision of policy selection
         alpha     = alphas(idx_figure);       % precision of action selection
@@ -409,21 +412,24 @@ if active_inference_lots
         Trial_num = data(:,4);
 
         % Plot prob to choose risky as a function of trials:
-        prob_cue_trialNum = splitapply(@mean,Prob_cue,Trial_num);
-
-        figure, set(gcf,'color','white'), title('Probability to sample the cue first as a function of time')
-        plot(prob_cue_trialNum,'-.','LineWidth',2)
-        set(gca, 'YTick', [0:0.25:1]),ylabel('Probability')
-        ylim([0,1.2])
-        set(gca, 'XTick', [0:2:length(prob_cue_trialNum)]),xlabel('Trial Number')
+        prob_cue_trialNum(idx_figure,:) = splitapply(@mean,Prob_cue,Trial_num)';
 
     end
+    
+        figure, hold on 
+        set(gcf,'color','white'), title('Probability to sample the cue first as a function of time')
+        plot(prob_cue_trialNum(1,:),'-.','LineWidth',2)
+        plot(prob_cue_trialNum(2,:),'-.','LineWidth',2)
+        set(gca, 'YTick', [0:0.25:1]),ylabel('Probability')
+        ylim([0,1.2])
+        set(gca, 'XTick', [0:2:length(prob_cue_trialNum)]),xlabel('Trial Number') 
+        legend('Random context','Stable context')
+        hold off
 
 end
 
 %% ========================================================================
-% 5.) Active Inference - simulate lots of trials
-% Figs 12-14
+% 5.) Active inference vs. active learning
 % Compare active learning (curiosity) and active inference (ambiguity) in
 % the two tasks above, i.e. 
 % i) unkown risky option (Figure 12)
@@ -455,7 +461,6 @@ end
 
 %% ========================================================================
 % 6.) Illustrate effects of other parameters - effects of a0
-% Figs 15
 % Can be illustrated using individual experiments
 %==========================================================================
 
@@ -473,7 +478,7 @@ if effects_modelparams_a0
 
     simulate = false;
 
-    N_Figures   = [151 152 153 154 155 156];
+    N_Figures   = 1:6;
     Rprobs      = [0.75 0.75 0.75 0.25 0.75 0.25];
     betas       = [2^0 2^0 2^0 2^0 2^0 2^0];
     alphas      = [4 4 4 4 4 4];
@@ -528,7 +533,6 @@ end
     
 %% ========================================================================
 % 7.) Illustrate effects of other parameters - effects of c in Learning
-% Figs 16
 % Illustrates risk etc
 % Best illustrated using lots of trials
 %==========================================================================    
@@ -546,7 +550,7 @@ if effects_modelparams_cL
 
     simulate = false;
 
-    N_Figures   = [161 162 163 164 165 166];
+    N_Figures   = 1:6;
     Rprobs      = [0.5 0.5 0.5 0.5 0.5 0.5];
     betas       = [2^0 2^0 2^0 2^0 2^0 2^0];
     alphas      = [4 4 4 4 4 4];
@@ -557,7 +561,7 @@ if effects_modelparams_cL
 
     N_sims = 1000;
     
-    figure(16), set(gcf,'color','white'), hold on
+    figure, set(gcf,'color','white'), hold on
 
     for idx_figure = 1:length(N_Figures)
 
@@ -660,7 +664,6 @@ end
 
 %% ========================================================================
 % 8.) Illustrate effects of other parameters - effects of c in Inference
-% Figs 17
 % Illustrates cost of information
 % Can be illustrated using individual experiments
 %========================================================================== 
@@ -676,7 +679,7 @@ if effects_modelparams_cI
 
     simulate = false;
 
-    N_Figures   = [171 172 173];
+    N_Figures   = 1:3;
     betas       = [2^0 2^0 2^0];
     alphas      = [16 16 16];
     etas        = [0.5 0.5 0.5];
@@ -734,7 +737,7 @@ if effects_modelparams_cI
 
     simulate = false;
 
-    N_Figures   = [181 182 183 184 185];
+    N_Figures   = 1:5;
     betas       = [2^0 2^0 2^0 2^0 2^0];
     alphas      = [16 16 16 16 16];
     etas        = [0.5 0.5 0.5 0.5 0.5];
@@ -744,7 +747,7 @@ if effects_modelparams_cI
 
     N_sims = 1000;
     
-    figure(18), set(gcf,'color','white'), title('Probability to sample the cue first as a function of time')
+    figure, set(gcf,'color','white'), title('Probability to sample the cue first as a function of time')
     hold on
 
     for idx_figure = 1:length(N_Figures)
@@ -846,7 +849,6 @@ end
 
 %% ========================================================================
 % 9.) Illustrate effects of other parameters - effects of d in Inference
-% Figs 19
 % Illustrates effects of priors on hidden state
 % Also show reversal learning experiments here
 %========================================================================== 
@@ -859,7 +861,7 @@ if effects_modelparams_d
 
     simulate = false;
 
-    N_Figures   = [191 192];
+    N_Figures   = 1:2;
     betas       = [2^0 2^0];
     alphas      = [16 16];
     etas        = [0.5 0.5];
@@ -914,7 +916,7 @@ if effects_modelparams_d
 
     simulate = false;
 
-    N_Figures   = [201 202];
+    N_Figures   = 1:2;
     betas       = [2^0 2^0];
     alphas      = [16 16];
     etas        = [0.5 0.5];
@@ -924,7 +926,7 @@ if effects_modelparams_d
 
     N_sims = 1000;
     
-    figure(20), set(gcf,'color','white'), title('Probability to sample the cue first as a function of time')
+    figure, set(gcf,'color','white'), title('Probability to sample the cue first as a function of time')
     hold on    
 
     for idx_figure = 1:length(N_Figures)
@@ -1044,7 +1046,7 @@ if active_learning_sigmoid
 
     simulate = false;    
 
-    N_Figures   = [2111 2112 2113 2114 2115];
+    N_Figures   = 1:5;
     Rprobs      = [0.5];
     betas       = [2^0];
     alphas      = [4];
@@ -1055,7 +1057,7 @@ if active_learning_sigmoid
     
     Prob_risky = nan(1,length(c_high));
     
-    figure(211), set(gcf,'color','white'), hold on
+    figure, set(gcf,'color','white'), hold on
 
     for idx_figure = 1:length(N_Figures)    
         
@@ -1118,7 +1120,7 @@ if active_learning_sigmoid
 
     simulate = false;    
 
-    N_Figures   = [2121 2122 2123 2124 2125];
+    N_Figures   = 1:5;
     Rprobs      = [0.5];
     betas       = [2^-3 2^-1 2^0 2^1 2^3];
     alphas      = [4];
@@ -1179,7 +1181,6 @@ end
 
 %% ========================================================================
 % Active Learning, non-linear effect of value?
-% Figs 22
 % Problem: Rat in a maze has to decide whether to go for safe option (left)
 % or try risky option (right) with higher reward but possibility of winning
 % nothing
@@ -1191,12 +1192,12 @@ if active_learning_value
     saved_data = {'Prob_risky_22_flatBeta' ...    % Choice probabilities for constant beta of 2^0
                   'Prob_risky_22_ChangeBeta'};    % Choice probabilities for parametrically varying beta between 2^3 and 2^-3
 
-    simulate = false;    
+    simulate = true;    
 
-    N_Figures   = [221 222];
+    N_Figures   = 1:2;
     Rprobs      = [0.5];
     betas       = [linspace(2^0,2^0,21);
-                   linspace(2^3,2^-3,21)];
+                   linspace(2^1,2^-1,21)];
     alphas      = [4];
     etas        = [0.5];
     curiosities = [true];
@@ -1252,7 +1253,7 @@ if active_learning_value
         set(gca, 'YTick', [1:5:length(c_low)]),set(gca, 'YTickLabel', {[c_low(length(c_low):-5:1)]})
         set(gca, 'XTick', [1:5:length(c_high)]),set(gca, 'XTickLabel', {[c_high(1:5:length(c_high))]})
         line([1 length(c_high)],[length(c_low) 1],'Color','black','LineStyle','--')
-        colorbar,caxis([0 1])    
+        colorbar,caxis([0 1]),colormap(hot) 
     
     end
 
